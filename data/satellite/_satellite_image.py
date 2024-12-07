@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import geopandas as gpd
 import osmnx as ox
@@ -7,22 +8,25 @@ import rasterio.features
 from shapely.geometry import Point, Polygon
 from snapista import Graph, Operator, TargetBand, TargetBandDescriptors, graph_io
 import requests
+from datetime import datetime, timedelta
 
 BANDS = ['x', 'y', 'lat', 'lon', 'c2rcc_flags', 'conc_chl', 'unc_chl', 'conc_tsm', 'unc_tsm']
+lakes = pd.read_excel("./data/lake/ref lakes.xlsx")
 
 
-def _get_satellite_image_api(filename:str):
+def _get_satellite_image_api(filename: str):
+    polygon = _get_polygon(filename)
+    date = datetime.strptime(filename[4:][:10].replace("_", "-"), '%Y-%m-%d').date()
+    start_date = date - timedelta(days=5)
+    end_date = date + timedelta(days=5)
+
     # Make sure access_token is defined
-    with open("_access_token.txt") as access_token_file:
+    with open("./data/satellite/_access_token.txt") as access_token_file:
         access_token = access_token_file.read()
 
-    # Make sure access_token is defined
-    access_token = "your_access_token"  # Replace with your actual access token
-
-    url = f"https://download.dataspace.copernicus.eu/odata/v1/Products(<product_id>)/$value"
+    url = f"https://download.dataspace.copernicus.eu/odata/v1/Products?OData.CSC.Intersects(area=geography'SRID=4326;{polygon} and ContentDate/Start gt {start_date} and ContentDate/Start lt {end_date}/$value"
 
     headers = {"Authorization": f"Bearer {access_token}"}
-
     # Create a session and update headers
     session = requests.Session()
     session.headers.update(headers)
@@ -32,7 +36,7 @@ def _get_satellite_image_api(filename:str):
 
     # Check if the request was successful
     if response.status_code == 200:
-        with open("./product.zip", "wb") as file:
+        with open(f"./data/satellite/images/{filename}.zip", "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:  # filter out keep-alive new chunks
                     file.write(chunk)
@@ -40,9 +44,13 @@ def _get_satellite_image_api(filename:str):
         print(f"Failed to download file. Status code: {response.status_code}")
         print(response.text)
 
+
 def _get_polygon(filename: str):
-    lat, lon = 46.94, -71.39
-    gdf_lake = ox.geometries_from_point((lat, lon), tags={'water': 'lake'}).reset_index(drop=True)[['geometry']]
+    lake = filename[:3]
+    lat = round(lakes[lakes["Reservoir abbreviation"] == lake]["Latitude"].iloc[0], 2)
+    lon = round(lakes[lakes["Reservoir abbreviation"] == lake]["Longitude"].iloc[0], 2)
+
+    gdf_lake = ox.geometries_from_point((lat, lon), tags={'natural': 'water'}, dist=2000).reset_index(drop=True)[['geometry']]
     geom_col = gdf_lake.geometry.name
 
     # on rajoute un buffer autour du polygone du lac
@@ -58,7 +66,7 @@ def _get_polygon(filename: str):
     gdf_lake.set_geometry(geom_col, inplace=True)
     gdf_lake.drop(columns='buffered_polygon', inplace=True)
 
-    return lake_polygon.envelope.wtk
+    return lake_polygon.envelope.wkt
 
 
 def _create_graph(filename: str) -> str:
@@ -157,6 +165,7 @@ def _create_geo_data_frame(filename: str, geotiff_filepath: str) -> str:
     return gdf_filepath
 
 
+_get_satellite_image_api("BHR_2020_07_01")
 # filenames = "TO DO"
 #
 # for filename in filenames:
