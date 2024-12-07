@@ -14,8 +14,9 @@ BANDS = ['x', 'y', 'lat', 'lon', 'c2rcc_flags', 'conc_chl', 'unc_chl', 'conc_tsm
 lakes = pd.read_excel("./data/lake/ref lakes.xlsx")
 
 
-def _get_satellite_image_api(filename: str):
-    polygon = _get_polygon(filename)
+def _get_satellite_image_api(filename: str) -> str:
+    # Prétraitement des infos
+    polygon = _get_polygon(filename)['polygon']
     date = datetime.strptime(filename[4:][:10].replace("_", "-"), '%Y-%m-%d').date()
     start_date = date - timedelta(days=5)
     end_date = date + timedelta(days=5)
@@ -44,6 +45,8 @@ def _get_satellite_image_api(filename: str):
         print(f"Failed to download file. Status code: {response.status_code}")
         print(response.text)
 
+    return f"./data/satellite/images/{filename}.zip"
+
 
 def _get_polygon(filename: str):
     lake = filename[:3]
@@ -66,7 +69,7 @@ def _get_polygon(filename: str):
     gdf_lake.set_geometry(geom_col, inplace=True)
     gdf_lake.drop(columns='buffered_polygon', inplace=True)
 
-    return lake_polygon.envelope.wkt
+    return {'polygon': lake_polygon.envelope.wkt, 'gdf': gdf_lake}
 
 
 def _create_graph(filename: str) -> str:
@@ -82,7 +85,7 @@ def _create_graph(filename: str) -> str:
     resample_op.upsamplingMethod = 'Bicubic'
 
     # Subset operator
-    lake_polygon_envelope = _get_polygon(filename)
+    lake_polygon_envelope = _get_polygon(filename)['polygon']
     subset_op = Operator('Subset')
     subset_op.geoRegion = lake_polygon_envelope
     subset_op.copyMetadata = "true"
@@ -155,12 +158,12 @@ def _create_geo_data_frame(filename: str, geotiff_filepath: str) -> str:
 
     gdf_tiff = gpd.GeoDataFrame(pd.DataFrame(data=data), crs=crs, geometry='geometry').to_crs('EPSG:4326')
     gdf_filepath = f'./data/{filename}_tiff_all_pixels.geojson'
-    gdf_tiff = (gdf_tiff.sjoin(gdf_lake, how='inner', predicate='within')
+    gdf_tiff = (gdf_tiff.sjoin(_get_polygon(filename)['gdf'], how='inner', predicate='within')
                 .drop(columns='index_right')
                 .reset_index(drop=True)
                 )
 
-    gdf_tiff.to_file(f'./data/{sat_img_name}_tiff_lake_pixels.geojson')
+    gdf_tiff.to_file(f'./data/satellite/geojson/{filename}_tiff_lake_pixels.geojson')
 
     return gdf_filepath
 
