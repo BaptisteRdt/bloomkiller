@@ -25,7 +25,7 @@ def _get_satellite_image_api(filename: str) -> str:
     with open("./data/satellite/_access_token.txt") as access_token_file:
         access_token = access_token_file.read()
 
-    url = f"https://download.dataspace.copernicus.eu/odata/v1/Products?OData.CSC.Intersects(area=geography'SRID=4326;{polygon} and ContentDate/Start gt {start_date} and ContentDate/Start lt {end_date}/$value"
+    url = f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=OData.CSC.Intersects(area=geography'SRID=4326;{polygon} and ContentDate/Start gt {start_date}T00:00:00.000Z and ContentDate/Start lt {end_date}T23:59:59.999Z/$zip"
 
     headers = {"Authorization": f"Bearer {access_token}"}
     # Create a session and update headers
@@ -37,6 +37,7 @@ def _get_satellite_image_api(filename: str) -> str:
 
     # Check if the request was successful
     if response.status_code == 200:
+        Path(f"./data/satellite/images/{filename}.zip").touch(exist_ok=True)
         with open(f"./data/satellite/images/{filename}.zip", "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:  # filter out keep-alive new chunks
