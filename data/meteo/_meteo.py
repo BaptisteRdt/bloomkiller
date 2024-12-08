@@ -1,7 +1,7 @@
 import openmeteo_requests
 import requests_cache
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from retry_requests import retry
 
 
@@ -46,7 +46,7 @@ def get_forcast_weather(lat, lon) -> pd.DataFrame:
 	return pd.DataFrame(data=hourly_data)
 
 
-def get_historical_weather(start_date: datetime, end_date: datetime, lat: float, lon: float) -> pd.DataFrame:
+def get_historical_weather(start_date: datetime.date, end_date: datetime.date, lat: float, lon: float) -> pd.DataFrame:
 	# Setup the Open-Meteo API client with cache and retry on error
 	cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
 	retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
@@ -58,8 +58,8 @@ def get_historical_weather(start_date: datetime, end_date: datetime, lat: float,
 	params = {
 		"latitude": lat,
 		"longitude": lon,
-		"start_date": start_date.strftime("%Y-%m-%d"),
-		"end_date": end_date.strftime("%Y-%m-%d"),
+		"start_date": start_date,
+		"end_date": end_date,
 		"hourly": "temperature_2m"
 	}
 	responses = openmeteo.weather_api(url, params=params)
