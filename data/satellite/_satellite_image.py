@@ -25,7 +25,7 @@ def _get_satellite_image_api(filename: str) -> str:
     with open("./data/satellite/_access_token.txt") as access_token_file:
         access_token = access_token_file.read()
 
-    url = f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=OData.CSC.Intersects(area=geography'SRID=4326;{polygon} and ContentDate/Start gt {start_date}T00:00:00.000Z and ContentDate/Start lt {end_date}T23:59:59.999Z/$zip"
+    url = f"https://catalogue.dataspace.copernicus.eu/odata/v1/Products?$filter=OData.CSC.Intersects(area=geography'SRID=4326;{polygon}) and ContentDate/Start gt {start_date}T00:00:00.000Z and ContentDate/Start lt {end_date}T23:59:59.999Z/&$format=zip"
 
     headers = {"Authorization": f"Bearer {access_token}"}
     # Create a session and update headers
@@ -167,11 +167,3 @@ def _create_geo_data_frame(filename: str, geotiff_filepath: str) -> str:
     gdf_tiff.to_file(f'./data/satellite/geojson/{filename}_tiff_lake_pixels.geojson')
 
     return gdf_filepath
-
-
-_get_satellite_image_api("BHR_2020_07_01")
-# filenames = "TO DO"
-#
-# for filename in filenames:
-#     geotiff_filepath = _create_graph(filename)
-#     geojson_filepath = _create_geo_data_frame(filename, geotiff_filepath)
